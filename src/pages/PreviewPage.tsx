@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import StatusBadge from '../components/StatusBadge';
+import SmartImage from '../components/SmartImage';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { questionsApi, testsApi } from '../api';
 import type { Question, Test } from '../types';
@@ -143,14 +144,7 @@ export default function PreviewPage() {
                     <span dangerouslySetInnerHTML={{ __html: q.question }} />
                   </p>
                   {q.media_url && (
-                    <img
-                      className="preview-q-image"
-                      src={q.media_url}
-                      alt="Question media"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
+                    <SmartImage className="preview-q-image" src={q.media_url} alt="Question media" />
                   )}
                   <ul className="preview-options">
                     {(['option1', 'option2', 'option3', 'option4'] as const).map((opt, i) => (

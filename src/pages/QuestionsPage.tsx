@@ -6,6 +6,7 @@ import { z } from 'zod';
 import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
 import RichTextEditor from '../components/RichTextEditor';
+import SmartImage from '../components/SmartImage';
 import { questionsApi, subjectsApi, testsApi } from '../api';
 import { downloadSampleCsv, parseQuestionsCsv } from '../utils/csv';
 import type { Question, Subject, SubTopic, Test, Topic } from '../types';
@@ -339,13 +340,7 @@ export default function QuestionsPage() {
             {mediaUrl ? (
               <div className="image-preview">
                 <span className="image-preview-label">Image preview</span>
-                <img
-                  src={mediaUrl}
-                  alt="Question media"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
+                <SmartImage src={mediaUrl} alt="Question media" showError />
               </div>
             ) : null}
 
@@ -380,11 +375,7 @@ export default function QuestionsPage() {
                   <div className="q-number">Q{idx + 1}</div>
                   <div className="q-body">
                     <div className="q-text" dangerouslySetInnerHTML={{ __html: q.question }} />
-                    {q.media_url && (
-                      <img className="q-thumb" src={q.media_url} alt="" onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }} />
-                    )}
+                    {q.media_url && <SmartImage className="q-thumb" src={q.media_url} />}
                     <p className="q-meta">
                       Answer: {q[q.correct_option]} · {q.difficulty || 'medium'}
                     </p>
