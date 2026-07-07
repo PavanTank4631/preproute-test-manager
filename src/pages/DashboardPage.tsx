@@ -8,30 +8,53 @@ import { testsApi } from '../api';
 import { formatDate } from '../utils/formatDate';
 import type { Test } from '../types';
 
+const TESTS_CACHE_KEY = 'tests_cache';
+
+function readCachedTests(): Test[] | null {
+  try {
+    const raw = sessionStorage.getItem(TESTS_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as Test[]) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const [tests, setTests] = useState<Test[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cached = readCachedTests();
+  const [tests, setTests] = useState<Test[]>(cached || []);
+  const [loading, setLoading] = useState(!cached);
+  const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [deleteTarget, setDeleteTarget] = useState<Test | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
 
-  const fetchTests = async () => {
-    setLoading(true);
+  const fetchTests = async (hasCache: boolean) => {
+    if (hasCache) setRefreshing(true);
+    else setLoading(true);
     try {
       const res = await testsApi.getAll();
-      setTests(res.data.data || []);
+      const list = res.data.data || [];
+      setTests(list);
+      try {
+        sessionStorage.setItem(TESTS_CACHE_KEY, JSON.stringify(list));
+      } catch {
+        /* ignore quota errors */
+      }
     } catch {
-      setError('Failed to load tests');
+      if (!hasCache) setError('Failed to load tests');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
   useEffect(() => {
-    fetchTests();
+    fetchTests(!!cached);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const filtered = tests.filter((t) => {
@@ -42,12 +65,29 @@ export default function DashboardPage() {
     return matchSearch && matchStatus;
   });
 
+  const PAGE_SIZE = 25;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paged = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter]);
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
       await testsApi.delete(deleteTarget.id);
-      setTests((prev) => prev.filter((t) => t.id !== deleteTarget.id));
+      setTests((prev) => {
+        const next = prev.filter((t) => t.id !== deleteTarget.id);
+        try {
+          sessionStorage.setItem(TESTS_CACHE_KEY, JSON.stringify(next));
+        } catch {
+          /* ignore quota errors */
+        }
+        return next;
+      });
       setDeleteTarget(null);
     } catch {
       setError('Could not delete test');
@@ -61,7 +101,10 @@ export default function DashboardPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">All Tests</h1>
-          <p className="page-subtitle">Manage and publish your test papers</p>
+          <p className="page-subtitle">
+            Manage and publish your test papers
+            {refreshing && <span className="refresh-hint"> · refreshing…</span>}
+          </p>
         </div>
         <button className="btn btn-primary" onClick={() => navigate('/tests/new')}>
           + Create New Test
@@ -113,7 +156,7 @@ export default function DashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((test) => (
+              {paged.map((test) => (
                 <tr key={test.id}>
                   <td className="td-name">{test.name}</td>
                   <td>{test.subject}</td>
@@ -146,6 +189,31 @@ export default function DashboardPage() {
               ))}
             </tbody>
           </table>
+          <div className="pagination">
+            <span className="pagination-info">
+              Showing {(currentPage - 1) * PAGE_SIZE + 1}–
+              {Math.min(currentPage * PAGE_SIZE, filtered.length)} of {filtered.length}
+            </span>
+            <div className="pagination-controls">
+              <button
+                className="btn btn-outline btn-sm"
+                disabled={currentPage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                ← Prev
+              </button>
+              <span className="pagination-page">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                className="btn btn-outline btn-sm"
+                disabled={currentPage >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next →
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
