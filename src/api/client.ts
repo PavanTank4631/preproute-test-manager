@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE = 'https://admin-moderator-backend-staging.up.railway.app/api';
+const API_BASE = '/api';
 
 const client = axios.create({
   baseURL: API_BASE,
