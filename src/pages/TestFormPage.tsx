@@ -11,7 +11,7 @@ import type { Subject, SubTopic, TestType, Topic } from '../types';
 
 const schema = z.object({
   name: z.string().min(1, 'Test name is required'),
-  type: z.enum(['chapterwise', 'full_length', 'topicwise']),
+  type: z.enum(['chapterwise', 'mock', 'pyq']),
   subject: z.string().min(1, 'Subject is required'),
   difficulty: z.enum(['easy', 'medium', 'hard']),
   correct_marks: z.number().min(0),
@@ -228,8 +228,8 @@ export default function TestFormPage() {
               <label className="form-label">Test Type</label>
               <select className="form-input" {...register('type')}>
                 <option value="chapterwise">Chapterwise</option>
-                <option value="full_length">Full Length</option>
-                <option value="topicwise">Topicwise</option>
+                <option value="mock">Mock</option>
+                <option value="pyq">Previous Year (PYQ)</option>
               </select>
             </div>
 

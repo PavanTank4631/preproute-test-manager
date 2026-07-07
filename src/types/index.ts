@@ -23,7 +23,7 @@ export interface SubTopic {
 }
 
 export type TestStatus = 'draft' | 'live' | 'unpublished' | 'scheduled' | 'expired';
-export type TestType = 'chapterwise' | 'full_length' | 'topicwise';
+export type TestType = 'chapterwise' | 'mock' | 'pyq';
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
 export interface Test {
