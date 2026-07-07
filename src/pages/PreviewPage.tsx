@@ -139,8 +139,19 @@ export default function PreviewPage() {
               {questions.map((q, idx) => (
                 <div key={q.id || idx} className="preview-q">
                   <p className="preview-q-text">
-                    <strong>Q{idx + 1}.</strong> {q.question}
+                    <strong>Q{idx + 1}.</strong>{' '}
+                    <span dangerouslySetInnerHTML={{ __html: q.question }} />
                   </p>
+                  {q.media_url && (
+                    <img
+                      className="preview-q-image"
+                      src={q.media_url}
+                      alt="Question media"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  )}
                   <ul className="preview-options">
                     {(['option1', 'option2', 'option3', 'option4'] as const).map((opt, i) => (
                       <li

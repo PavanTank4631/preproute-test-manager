@@ -1,6 +1,4 @@
-import { useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { useAuthStore } from './store/authStore';
 import ProtectedRoute from './routes/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
@@ -9,12 +7,6 @@ import QuestionsPage from './pages/QuestionsPage';
 import PreviewPage from './pages/PreviewPage';
 
 export default function App() {
-  const hydrate = useAuthStore((s) => s.hydrate);
-
-  useEffect(() => {
-    hydrate();
-  }, [hydrate]);
-
   return (
     <BrowserRouter>
       <Routes>

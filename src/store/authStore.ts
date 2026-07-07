@@ -6,12 +6,21 @@ interface AuthState {
   user: User | null;
   setAuth: (token: string, user: User) => void;
   logout: () => void;
-  hydrate: () => void;
+}
+
+function readStoredUser(): User | null {
+  const raw = localStorage.getItem('auth_user');
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as User;
+  } catch {
+    return null;
+  }
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  token: null,
-  user: null,
+  token: localStorage.getItem('auth_token'),
+  user: readStoredUser(),
 
   setAuth: (token, user) => {
     localStorage.setItem('auth_token', token);
@@ -23,17 +32,5 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user');
     set({ token: null, user: null });
-  },
-
-  hydrate: () => {
-    const token = localStorage.getItem('auth_token');
-    const raw = localStorage.getItem('auth_user');
-    if (token && raw) {
-      try {
-        set({ token, user: JSON.parse(raw) });
-      } catch {
-        localStorage.clear();
-      }
-    }
   },
 }));

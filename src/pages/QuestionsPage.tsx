@@ -1,15 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
+import RichTextEditor from '../components/RichTextEditor';
 import { questionsApi, subjectsApi, testsApi } from '../api';
+import { downloadSampleCsv, parseQuestionsCsv } from '../utils/csv';
 import type { Question, Subject, SubTopic, Test, Topic } from '../types';
 
 const questionSchema = z.object({
-  question: z.string().min(1, 'Question text is required'),
+  question: z
+    .string()
+    .refine((v) => v.replace(/<[^>]*>/g, '').trim().length > 0, 'Question text is required'),
   option1: z.string().min(1, 'Required'),
   option2: z.string().min(1, 'Required'),
   option3: z.string().min(1, 'Required'),
@@ -24,6 +28,20 @@ const questionSchema = z.object({
 
 type QForm = z.infer<typeof questionSchema>;
 
+const emptyForm: QForm = {
+  question: '',
+  option1: '',
+  option2: '',
+  option3: '',
+  option4: '',
+  correct_option: 'option1',
+  explanation: '',
+  difficulty: 'medium',
+  topic: '',
+  sub_topic: '',
+  media_url: '',
+};
+
 export default function QuestionsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -37,17 +55,22 @@ export default function QuestionsPage() {
   const [saving, setSaving] = useState(false);
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [apiError, setApiError] = useState('');
+  const [csvNotice, setCsvNotice] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
     handleSubmit,
     reset,
-    setValue,
+    control,
+    watch,
     formState: { errors },
   } = useForm<QForm>({
     resolver: zodResolver(questionSchema),
-    defaultValues: { correct_option: 'option1', difficulty: 'medium' },
+    defaultValues: emptyForm,
   });
+
+  const mediaUrl = watch('media_url');
 
   useEffect(() => {
     if (!id) return;
@@ -104,31 +127,57 @@ export default function QuestionsPage() {
     } else {
       setQuestions((prev) => [...prev, q]);
     }
-    reset({ correct_option: 'option1', difficulty: 'medium' });
+    reset(emptyForm);
   };
 
   const startEdit = (idx: number) => {
     const q = questions[idx];
     setEditIdx(idx);
-    setValue('question', q.question);
-    setValue('option1', q.option1);
-    setValue('option2', q.option2);
-    setValue('option3', q.option3);
-    setValue('option4', q.option4);
-    setValue('correct_option', q.correct_option);
-    setValue('explanation', q.explanation || '');
-    setValue('difficulty', q.difficulty || 'medium');
-    setValue('topic', q.topic || '');
-    setValue('sub_topic', q.sub_topic || '');
-    setValue('media_url', q.media_url || '');
+    reset({
+      question: q.question,
+      option1: q.option1,
+      option2: q.option2,
+      option3: q.option3,
+      option4: q.option4,
+      correct_option: q.correct_option,
+      explanation: q.explanation || '',
+      difficulty: q.difficulty || 'medium',
+      topic: q.topic || '',
+      sub_topic: q.sub_topic || '',
+      media_url: q.media_url || '',
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const removeQuestion = (idx: number) => {
     setQuestions((prev) => prev.filter((_, i) => i !== idx));
     if (editIdx === idx) {
       setEditIdx(null);
-      reset({ correct_option: 'option1', difficulty: 'medium' });
+      reset(emptyForm);
     }
+  };
+
+  const handleCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCsvNotice('');
+    setApiError('');
+
+    const { questions: parsed, errors } = await parseQuestionsCsv(file);
+    if (parsed.length) {
+      const mapped: Question[] = parsed.map((p) => ({
+        ...(p as Question),
+        type: 'mcq',
+        test_id: id,
+        subject: subjectId,
+      }));
+      setQuestions((prev) => [...prev, ...mapped]);
+    }
+
+    const summary = `Imported ${parsed.length} question(s) from CSV.`;
+    setCsvNotice(errors.length ? `${summary} ${errors.length} row(s) skipped: ${errors.join('; ')}` : summary);
+
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleSaveContinue = async () => {
@@ -139,7 +188,21 @@ export default function QuestionsPage() {
     setSaving(true);
     setApiError('');
     try {
-      const res = await questionsApi.bulkCreate(questions);
+      const payload = questions.map((q) => ({
+        type: 'mcq' as const,
+        question: q.question,
+        option1: q.option1,
+        option2: q.option2,
+        option3: q.option3,
+        option4: q.option4,
+        correct_option: q.correct_option,
+        explanation: q.explanation,
+        difficulty: q.difficulty,
+        media_url: q.media_url,
+        test_id: id,
+        subject: subjectId,
+      }));
+      const res = await questionsApi.bulkCreate(payload);
       const createdIds = res.data.data.map((q) => q.id!).filter(Boolean);
       await testsApi.update(id!, {
         questions: createdIds,
@@ -168,9 +231,28 @@ export default function QuestionsPage() {
             {test?.name} · {test?.subject} · {questions.length} question(s) added
           </p>
         </div>
+        <div className="header-actions">
+          <button className="btn btn-outline btn-sm" onClick={downloadSampleCsv}>
+            Download CSV template
+          </button>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Upload CSV
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            hidden
+            onChange={handleCsvUpload}
+          />
+        </div>
       </div>
 
       {apiError && <div className="alert alert-error">{apiError}</div>}
+      {csvNotice && <div className="alert alert-success">{csvNotice}</div>}
 
       <div className="questions-layout">
         <div className="form-card">
@@ -179,11 +261,17 @@ export default function QuestionsPage() {
           <form onSubmit={handleSubmit(onAddQuestion)}>
             <div className="form-group">
               <label className="form-label">Question *</label>
-              <textarea
-                className={`form-input ${errors.question ? 'input-error' : ''}`}
-                rows={3}
-                placeholder="Enter question text"
-                {...register('question')}
+              <Controller
+                name="question"
+                control={control}
+                render={({ field }) => (
+                  <RichTextEditor
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder="Type the question. Use the toolbar for bold, italic, x², etc."
+                    error={!!errors.question}
+                  />
+                )}
               />
               {errors.question && <span className="field-error">{errors.question.message}</span>}
             </div>
@@ -243,10 +331,23 @@ export default function QuestionsPage() {
                 <input className="form-input" placeholder="Explain the answer" {...register('explanation')} />
               </div>
               <div className="form-group span-2">
-                <label className="form-label">Media URL (optional)</label>
-                <input className="form-input" placeholder="https://..." {...register('media_url')} />
+                <label className="form-label">Image URL (optional)</label>
+                <input className="form-input" placeholder="https://... paste an image link" {...register('media_url')} />
               </div>
             </div>
+
+            {mediaUrl ? (
+              <div className="image-preview">
+                <span className="image-preview-label">Image preview</span>
+                <img
+                  src={mediaUrl}
+                  alt="Question media"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
+            ) : null}
 
             <div className="form-actions">
               {editIdx !== null && (
@@ -255,7 +356,7 @@ export default function QuestionsPage() {
                   className="btn btn-outline"
                   onClick={() => {
                     setEditIdx(null);
-                    reset({ correct_option: 'option1', difficulty: 'medium' });
+                    reset(emptyForm);
                   }}
                 >
                   Cancel Edit
@@ -271,14 +372,19 @@ export default function QuestionsPage() {
         <div className="questions-list-panel">
           <h2 className="section-title">Added Questions ({questions.length})</h2>
           {questions.length === 0 ? (
-            <p className="empty-hint">No questions yet. Add your first one on the left.</p>
+            <p className="empty-hint">No questions yet. Add one on the left or import a CSV.</p>
           ) : (
             <ul className="questions-list">
               {questions.map((q, idx) => (
                 <li key={idx} className="question-item">
                   <div className="q-number">Q{idx + 1}</div>
                   <div className="q-body">
-                    <p className="q-text">{q.question}</p>
+                    <div className="q-text" dangerouslySetInnerHTML={{ __html: q.question }} />
+                    {q.media_url && (
+                      <img className="q-thumb" src={q.media_url} alt="" onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }} />
+                    )}
                     <p className="q-meta">
                       Answer: {q[q.correct_option]} · {q.difficulty || 'medium'}
                     </p>
