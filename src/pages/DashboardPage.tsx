@@ -166,24 +166,26 @@ export default function DashboardPage() {
                   <td>{test.total_questions}</td>
                   <td>{formatDate(test.created_at)}</td>
                   <td className="td-actions">
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => navigate(`/tests/${test.id}/preview`)}
-                    >
-                      View
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => navigate(`/tests/${test.id}/edit`)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-sm text-danger"
-                      onClick={() => setDeleteTarget(test)}
-                    >
-                      Delete
-                    </button>
+                    <div className="td-actions-inner">
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => navigate(`/tests/${test.id}/preview`)}
+                      >
+                        View
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => navigate(`/tests/${test.id}/edit`)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-sm text-danger"
+                        onClick={() => setDeleteTarget(test)}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

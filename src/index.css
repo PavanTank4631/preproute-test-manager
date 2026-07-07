@@ -167,7 +167,8 @@ textarea.form-input { resize: vertical; min-height: 80px; }
 .data-table tr:last-child td { border-bottom: none; }
 .data-table tr:hover td { background: #fafafa; }
 .td-name { font-weight: 500; }
-.td-actions { display: flex; gap: 0.25rem; }
+.td-actions { white-space: nowrap; }
+.td-actions-inner { display: flex; gap: 0.25rem; align-items: center; }
 
 /* status badges */
 .status-badge {
